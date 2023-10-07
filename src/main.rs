@@ -1,14 +1,24 @@
-use std::io::{Error, ErrorKind, Result};
+use std::{
+    io::{Error, ErrorKind, Result},
+    time::Duration,
+};
 
-use redis::{cluster::ClusterClient, AsyncCommands};
+use bb8_redis_cluster::{bb8::Pool, RedisConnectionManager};
+use redis::AsyncCommands;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     println!("starting up!");
-    let nodes = vec!["redis://127.0.0.1:7000"];
-    let client = ClusterClient::new(nodes).map_err(|e| Error::new(ErrorKind::Other, e))?;
-    let mut conn = client
-        .get_async_connection()
+    let manager = RedisConnectionManager::new(vec!["redis://localhost:7000"]).unwrap();
+    let conn_pool = Pool::builder()
+        .max_size(15)
+        .connection_timeout(Duration::from_secs(1))
+        .build(manager)
+        .await
+        .map_err(|e| Error::new(ErrorKind::NotConnected, e))?;
+
+    let mut conn = conn_pool
+        .get()
         .await
         .map_err(|e| Error::new(ErrorKind::NotConnected, e))?;
 
